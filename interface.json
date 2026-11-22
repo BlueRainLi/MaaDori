@@ -20,34 +20,22 @@
         {
             "name": "安卓端",
             "type": "Adb",
-            "display_short_side": 720 // 默认缩放分辨率的短边长度
-        },
-        {
-            "name": "桌面端",
-            "type": "Win32",
-            "win32": {
-                "class_regex": ".*",
-                "window_regex": "Visual Studio",
-                // 截图及控制方式，请根据项目实际情况修改
-                // 文档: https://maafw.xyz/docs/2.4-ControlMethods
-                "screencap": "PrintWindow", // 截图方式
-                "mouse": "PostMessageWithCursorPos", // 鼠标控制方式
-                "keyboard": "PostMessageWithCursorPos" // 键盘控制方式
+            "display_short_side": 720, // 默认缩放分辨率的短边长度
+            // 目标 App：BanG Dream! 少女乐团派对（B 站国服）
+            // 包名 com.bilibili.star.bili，启动 / 停止 App 由 Client 侧调用（PI v2 协议本身无包名字段）
+            "adb": {
+                // 本机 adb 未加入 PATH（ANDROID_HOME 也未设置），这里直接指向 scrcpy 自带的 adb
+                "adb_path": "D:/Tools/scrcpy-win64-v4.0/adb.exe",
+                // LDPlayer 9 首个实例；adb devices 中显示为 emulator-5554
+                "address": "127.0.0.1:5555"
             }
         }
     ],
     "resource": [
         {
-            "name": "官服",
-            "path": [
-                "./resource"
-            ]
-        },
-        {
             "name": "B 服",
             "path": [
                 "./resource"
-                // "./resource_bilibili"
             ]
         }
     ],
@@ -59,6 +47,10 @@
     //     ]
     // },
     "task": [
+        {
+            "name": "启动游戏",
+            "entry": "启动游戏"
+        },
         {
             "name": "普通任务",
             "entry": "MyTask1"

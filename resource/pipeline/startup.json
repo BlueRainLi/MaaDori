@@ -1,0 +1,16 @@
+{
+    // 目标 App：BanG Dream! 少女乐团派对（B 站国服）
+    //
+    // package 必须写成 "包名/Activity" 的组件形式。依据 MaaFramework
+    // source/MaaAdbControlUnit/General/Activity.cpp 的 start_app：
+    //   intent 里不含 "/" → adb shell monkey -p {INTENT} 1
+    //   intent 里含  "/" → adb shell am start -n {INTENT}
+    // 本机 LDPlayer 镜像里没有 monkey（实测 `/system/bin/sh: monkey: inaccessible
+    // or not found`），所以只能走 am start 分支。
+    // 另外 com.bilibili.star.bili.MainActivity 未导出，用它会 SecurityException，
+    // 启动入口要填 PermissionActivity（实测可用）。
+    "启动游戏": {
+        "action": "StartApp",
+        "package": "com.bilibili.star.bili/com.bilibili.star.bili.PermissionActivity"
+    }
+}
