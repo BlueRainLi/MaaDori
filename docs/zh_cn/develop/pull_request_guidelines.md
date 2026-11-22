@@ -1,10 +1,10 @@
 # PR 规范
 
-本文档用于说明向 MaaPracticeBoilerplate 提交 Pull Request（PR）时的基本约定，也可作为基于本模板创建 MaaFramework 项目后的协作参考。
+本文档用于说明向 MaaDori 提交 Pull Request（PR）时的基本约定。
 
 ## 基本原则
 
-- **目标分支**：向本模板仓库提交 PR 时，默认目标分支为 `main`。
+- **目标分支**：向本仓库提交 PR 时，默认目标分支为 `main`。
 - **范围单一**：一个 PR 只解决一个明确问题，避免混入无关格式化、重构或功能改动。
 - **说明完整**：PR 描述应写清楚改动原因、影响范围和验证方式。
 - **优先复用**：修改模板能力前，先确认是否已有 MaaFramework、MaaCommonAssets 或工作流配置可复用。
@@ -81,7 +81,7 @@ PR 描述至少应包含以下信息：
 ## 验证
 
 - [x] 执行 `npm ci && npx @nekosu/maa-tools check`
-- [x] 执行 `python tools/validate_schema.py --schema-dir deps/tools --resource-dirs assets/resource --exclude-dirs assets/resource/announcement --interface-files assets/interface.json`
+- [x] 执行 `python tools/validate_schema.py --schema-dir deps/tools --resource-dirs resource --exclude-dirs resource/announcement --interface-files interface.json`
 - [x] 检查文档链接可正常跳转
 ```
 
@@ -99,7 +99,7 @@ PR 描述至少应包含以下信息：
 ### 模板资源改动
 
 - 坐标、ROI、模板图片等资源应遵循 MaaFramework 的 720p 基准约定。
-- 新增任务或资源时，需要检查 `assets/interface.json`、`assets/resource` 与任务配置是否一致。
+- 新增任务或资源时，需要检查 `interface.json`、`resource` 与任务配置是否一致。
 - 不要提交本地缓存、运行产物、调试截图或下载得到的大体积模型文件。
 - 修改 schema、资源目录或工作流时，需要说明对基于模板创建项目的影响。
 

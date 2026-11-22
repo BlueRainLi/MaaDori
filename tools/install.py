@@ -104,14 +104,19 @@ def install_resource():
     configure_ocr_model()
 
     shutil.copytree(
-        working_dir / "assets" / "resource",
+        working_dir / "resource",
         install_path / "resource",
         dirs_exist_ok=True,
     )
     shutil.copy2(
-        working_dir / "assets" / "interface.json",
+        working_dir / "interface.json",
         install_path,
     )
+
+    # interface_zh.json 为可选的多语言文件，存在时才一并打包
+    interface_zh = working_dir / "interface_zh.json"
+    if interface_zh.exists():
+        shutil.copy2(interface_zh, install_path)
 
     with open(install_path / "interface.json", "r", encoding="utf-8") as f:
         interface = jsonc.load(f)

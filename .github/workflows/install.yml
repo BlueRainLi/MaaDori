@@ -1,12 +1,5 @@
 name: install
 
-env:
-  # 版本控制：
-  # - 设置 VERSION 为空字符串时，下载 latest 版本
-  # - 设置 VERSION 为具体版本号时（如 v1.2.3），下载指定版本
-  MAAFW_VERSION: ""
-  MFAA_VERSION: ""
-
 on:
   push:
     tags:
@@ -15,20 +8,32 @@ on:
       - "**"
     paths:
       - ".github/workflows/install.yml"
-      - "assets/**"
+      - "resource/**"
+      - "agent/**"
+      - "interface.json"
+      - "interface_zh.json"
       - "**.py"
   pull_request:
     branches:
       - "**"
     paths:
       - ".github/workflows/install.yml"
-      - "assets/**"
+      - "resource/**"
+      - "agent/**"
+      - "interface.json"
+      - "interface_zh.json"
       - "**.py"
   workflow_dispatch:
+    inputs:
+      full_build:
+        description: "构建全部 8 个平台组合（默认只构建 win-x86_64）"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   meta:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,18 +67,30 @@ jobs:
           echo tag=$tag | tee -a $GITHUB_OUTPUT
           echo is_release=$is_release | tee -a $GITHUB_OUTPUT
           echo is_prerelease=$is_prerelease | tee -a $GITHUB_OUTPUT
+
+      - id: set_matrix
+        run: |
+          # 默认（含 tag 发版）只构建 win-x86_64，节省 Actions 时长与 Artifact Storage；
+          # 如需全部 8 个平台组合，请手动触发 workflow_dispatch 并勾选 full_build
+          full=${{ github.event_name == 'workflow_dispatch' && inputs.full_build == true }}
+          if [[ $full == true ]]; then
+            echo 'matrix={"os":["win","macos","linux","android"],"arch":["aarch64","x86_64"]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"os":["win"],"arch":["x86_64"]}' >> $GITHUB_OUTPUT
+          fi
     outputs:
       tag: ${{ steps.set_tag.outputs.tag }}
       is_release: ${{ steps.set_tag.outputs.is_release }}
       is_prerelease: ${{ steps.set_tag.outputs.is_prerelease }}
+      matrix: ${{ steps.set_matrix.outputs.matrix }}
 
   install:
-    needs: meta
-    runs-on: ubuntu-24.04
+    needs: [meta, changelog]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
     strategy:
-      matrix:
-        os: [win, macos, linux, android]
-        arch: [aarch64, x86_64]
+      matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
       fail-fast: false
 
     steps:
@@ -86,8 +103,7 @@ jobs:
         with:
           repository: MaaXYZ/MaaFramework
           fileName: "MAA-${{ matrix.os }}-${{ matrix.arch }}*"
-          latest: ${{ env.MAAFW_VERSION == '' }}
-          tag: ${{ env.MAAFW_VERSION }}
+          latest: true
           out-file-path: "deps"
           extract: true
 
@@ -98,8 +114,7 @@ jobs:
         with:
           repository: SweetSmellFox/MFAAvalonia
           fileName: "MFAAvalonia-*-${{ (matrix.os == 'win' && 'win') || (matrix.os == 'macos' && 'osx') || (matrix.os == 'linux' && 'linux') }}-${{ (matrix.arch == 'x86_64' && 'x64') || (matrix.arch == 'aarch64' && 'arm64') }}*"
-          latest: ${{ env.MFAA_VERSION == '' }}
-          tag: ${{ env.MFAA_VERSION }}
+          latest: true
           out-file-path: "MFA"
           extract: true
 
@@ -116,7 +131,7 @@ jobs:
         shell: bash
         run: |
           rm -rf MFA/runtimes
-      
+
       - name: Install
         shell: bash
         run: |
@@ -138,15 +153,55 @@ jobs:
           python ./install.py ${{ needs.meta.outputs.tag }} ${{ matrix.os }} ${{ matrix.arch }}
           cd ..
 
-      - uses: actions/upload-artifact@v4
+      # 发版：直接打包并上传 Release，不经过 artifact 中转，
+      # 彻底绕开 Actions Artifact Storage 配额限制
+      - name: Package release zip
+        if: ${{ needs.meta.outputs.is_release == 'true' }}
+        run: |
+          cd install
+          zip -r "../MaaDori-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.meta.outputs.tag }}.zip" .
+
+      - name: Release
+        if: ${{ needs.meta.outputs.is_release == 'true' }}
+        uses: softprops/action-gh-release@v2
         with:
-          name: MaaXXX-${{ matrix.os }}-${{ matrix.arch }}
+          files: "MaaDori-*"
+          tag_name: ${{ needs.meta.outputs.tag }}
+          # 发布说明末尾固定附加 MaaFW python 绑定升级提示：
+          # 包内 MaaFramework 跟随上游最新版（install.yml 用 latest: true 下载），
+          # 用户本机的 pip 绑定若是旧版（如 5.12.3），AgentServer 会因版本不配套启动失败
+          body: |
+            ${{ needs.changelog.outputs.release_body }}
+
+            ---
+
+            ### ⚠️ 使用前必读：更新 MaaFW python 绑定
+
+            本包内置的 MaaFramework 始终跟随上游最新版本。如果你曾安装过旧版本的
+            MAA 项目（本机 pip 绑定落后于包内版本），AgentServer 将无法启动
+            （表现为任务一直卡住 / agent 进程异常）。请先在终端执行：
+
+            ```
+            pip install -U MaaFw
+            ```
+
+            升级完成后再运行本包。
+          draft: false
+          prerelease: ${{ needs.meta.outputs.is_prerelease == 'true' }}
+
+      # 非发版（日常 CI）：仅上传 artifact 供调试，1 天后自动清理
+      - name: Upload debug artifact
+        if: ${{ needs.meta.outputs.is_release != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaaDori-${{ matrix.os }}-${{ matrix.arch }}
           path: "install"
+          retention-days: 1
 
   changelog:
     name: Generate changelog
     needs: meta
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       release_body: ${{ steps.git-cliff.outputs.content }}
     steps:
@@ -161,6 +216,8 @@ jobs:
         with:
           config: .github/cliff.toml
           # 正式版：使用 tag-pattern 只匹配正式版标签，包含所有从上一个正式版以来的提交
+          # 本项目正式版 tag 一律三段式（如 v0.6.0），pattern 依赖三段式匹配，
+          # 不要改回两段式（v0.6），否则匹配不到任何标签，说明会整体落入「未发布」
           # 预发布版：正常生成，只包含从上一个标签以来的提交
           args: >-
             -vv --latest --strip header
@@ -168,39 +225,3 @@ jobs:
         env:
           OUTPUT: CHANGES.md
           GITHUB_REPO: ${{ github.repository }}
-
-  release:
-    if: ${{ needs.meta.outputs.is_release == 'true' }}
-    needs: [meta, install, changelog]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: assets
-
-      - run: |
-          cd assets
-          for f in *; do
-            (cd $f && zip -r ../$f-${{ needs.meta.outputs.tag }}.zip .)
-          done
-          
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: assets/*
-          tag_name: ${{ needs.meta.outputs.tag }}
-          body: ${{ needs.changelog.outputs.release_body }}
-          draft: false
-          prerelease: ${{ needs.meta.outputs.is_prerelease == 'true' }}
-
-        # Mirror酱为第三方分发服务，新项目默认关闭
-        # 若有需要请联系 Mirror酱 开通，直接自行开启是无法使用的
-        # https://mirrorchyan.com/
-      - name: Trigger MirrorChyanUploading
-        if: false
-        # if: ${{ github.repository_owner == 'MaaXYZ' }}
-        shell: bash
-        run: |
-          gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan_release.yml -f tag=${{ needs.meta.outputs.tag }}
-          gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan_release_note.yml -f tag=${{ needs.meta.outputs.tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
