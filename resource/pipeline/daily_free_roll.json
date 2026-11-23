@@ -1,0 +1,129 @@
+{
+    // ── 流程：抽每日3抽 ─────────────────────────────────────────────────
+    //
+    // 主界面（判定 招募/乐队/故事 三个按钮都在）→ 点招募 → 招募页 →
+    // 左侧列表往上拉到最底部 → 定位「每日3次免费！演出招募」卡片（列表最后一项）
+    //
+    // 模板全部取自 1280x720 原生截图裁剪，与 720p 基线 1:1，无需缩放。
+    // 实测跨图得分：本屏 1.000，错屏/错按钮 ≤0.63，阈值 0.8 有充足余量。
+    "主界面": {
+        // 判定主界面：底部按钮条里 招募 / 乐队 / 故事 三个都在才算（少一个就不是主界面）
+        "recognition": "And",
+        "all_of": [
+            {
+                "recognition": "TemplateMatch",
+                "template": "home_zhaomu.png",
+                "roi": [
+                    600,
+                    580,
+                    660,
+                    130
+                ],
+                "threshold": 0.8
+            },
+            {
+                "recognition": "TemplateMatch",
+                "template": "home_yuedui.png",
+                "roi": [
+                    600,
+                    580,
+                    660,
+                    130
+                ],
+                "threshold": 0.8
+            },
+            {
+                "recognition": "TemplateMatch",
+                "template": "home_gushi.png",
+                "roi": [
+                    600,
+                    580,
+                    660,
+                    130
+                ],
+                "threshold": 0.8
+            }
+        ],
+        "action": "DoNothing",
+        "next": [
+            "点击招募"
+        ]
+    },
+    "点击招募": {
+        "recognition": "TemplateMatch",
+        "template": "home_zhaomu.png",
+        "roi": [
+            600,
+            580,
+            660,
+            130
+        ],
+        "threshold": 0.8,
+        "action": "Click",
+        "target": true, // 点模板命中框（即招募按钮）的中心
+        "post_delay": 1500, // 等页面转场
+        "next": [
+            "招募页"
+        ]
+    },
+    "招募页": {
+        // 抽卡页底部常驻的「招募详情」按钮，用它作「招募页已就绪」的锚点。
+        // 模板只取「招募详情」四个字（90x30），不取整个白色胶囊：
+        // 胶囊是半透明白底，会透出后面的卡面，换一个活动页得分就从 1.0 掉到 0.85；
+        // 纯文字在 STEP UP / 少女们的回忆 / 指挥官祭 三个页面实测都是 1.000，
+        // 主界面只有 0.278，区分度足够。
+        "recognition": "TemplateMatch",
+        "template": "roll_detail_button.png",
+        "roi": [
+            240,
+            640,
+            160,
+            60
+        ],
+        "threshold": 0.8,
+        "timeout": 20000,
+        "action": "DoNothing",
+        "next": [
+            "招募列表上滑",
+            "[JumpBack]教程弹窗"
+        ]
+    },
+    "招募列表上滑": {
+        // 左侧列表从 (130,520) 拖到 (130,140)。列表到底后会「夹住」不再动，
+        // 所以多点几下不会滑过头（实测第 3、4 次上滑画面完全不变）。
+        // 实测从列表顶部滑 3 次即可到达底部，卡片出现在 (60,175)。
+        "recognition": "DirectHit",
+        "action": "Swipe",
+        "begin": [
+            130,
+            520
+        ],
+        "end": [
+            130,
+            140
+        ],
+        "duration": 350,
+        "repeat": 3,
+        "repeat_delay": 700,
+        "post_delay": 800,
+        "next": [
+            "每日免费3抽"
+        ]
+    },
+    "每日免费3抽": {
+        // 列表最后一项「每日3次免费！演出招募」，就是每日免费 3 抽的入口。
+        // 模板只取卡面文字区（145x65），不取红色选中边框——卡片选中/未选中都能匹配，
+        // 实测选中 1.000、未选中 0.81，所以阈值取 0.75（当前屏 0.39，余量很大）。
+        "recognition": "TemplateMatch",
+        "template": "roll_daily_free_card.png",
+        "roi": [
+            0,
+            60,
+            270,
+            480
+        ],
+        "threshold": 0.75,
+        "timeout": 15000,
+        "action": "DoNothing" // 只定位，不点。下一步（点这张卡）待定
+    }
+}
